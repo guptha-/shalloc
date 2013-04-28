@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <mutex>
+#include <vector>
 using namespace std;
 
 namespace shalloclib {
@@ -28,9 +29,9 @@ namespace shalloclib {
 
       // This is the local lock. This is taken before reading and writing. This
       // does not have global significance, but prevents us from reading when
-      // the fields are being updated in the local copy. In the owner, for a local
-      // write, the common lock is taken after this. So, while a remote update is taking
-      // place, local reads cannot take place.
+      // the fields are being updated in the local copy. In the owner, for a 
+      // local write, the common lock is taken after this. So, while a remote 
+      // update is taking place, local reads cannot take place.
     mutex objLock;
 
       // This is pretty unusual. When we attempt to obtain the write lock
@@ -67,6 +68,9 @@ namespace shalloclib {
 
       // This contains this process's PID
     static pid_t ownPID;
+
+      // The list of processes that share the data structure
+    static vector<unsigned int> pidList;
 
     void test();
   };
