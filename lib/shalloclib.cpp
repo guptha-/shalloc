@@ -2,21 +2,107 @@
 
 using namespace shalloclib;
 
-pid_t sharedClass::ownPID = getpid();
-vector<unsigned int> sharedClass::pidList;
+pid_t SharedClass::ownPID = getpid();
+vector<pid_t> SharedClass::pidList;
+ObjIdLocMap SharedClass::objIdLocMap;
+unsigned int SharedClass::maxObjectID(0);
+  // Just for creation of subclasses
+static mutex createLock;
+  // The size of memory allocated. This is a temporary storage, 
+  // meaningful between the time memory is allocated by the new operator,
+  // and the base class constructor is called. This is used because the baseclass
+  // constructor does not know the size allocated for the subclass object.
+size_t memAlloc;
 
-/* This is a test for sharedClass
-*/
-void sharedClass::test() {
-  cout<<"Hey there"<<endl;
+/* Constructor
+ * @param objectID the unique ID for this particular object
+ * @param ownerPID the process ID of the owner of this object
+ */
+SharedClass::SharedClass(unsigned int objectID, pid_t ownerPID) {
+  this->objectID = objectID;
+  this->ownerPID = ownerPID;
+}
+
+/* Constructor
+ */
+SharedClass::SharedClass() {
+  cout<<"In parent's constructor"<<endl;
+
+  size_t memSize = memAlloc;
+  // Other creations can proceed
+  createLock.unlock();
+
+  // TODO find out why the seg fault occurs
+  // typedef unordered_set<int> MyObjIdLocMap;
+  // MyObjIdLocMap myObjIdLocMap;
+  // int a = 5;
+  // int b = 6;
+
+  // pair<MyObjIdLocMap::iterator, bool> notAlreadyExists;
+  // notAlreadyExists = myObjIdLocMap.emplace(b);
+  // if (get<1>(notAlreadyExists) != true)
+  // { 
+  //   cout<<"Exists"<<endl;
+  // }
+  // cout<<"Not Exists"<<endl;
+
+
+  // while (true == true) {
+  //   unsigned int objectID = ++maxObjectID;
+  //   this->objLock.lock();
+  //   pair<ObjIdLocMap::iterator, bool> notAlreadyExists;
+  //   int a = 5;
+  //   notAlreadyExists = objIdLocMap.emplace(objectID, &a);
+  //   if (get<1>(notAlreadyExists) != true)
+  //   {
+  //       // The entry already exists
+  //     continue;
+  //   }
+  //   break;
+  // }
+
+  objectID = memSize; // TODO
+  SharedClass(objectID, getpid());
+
+  // TODO send objectID, pid and memSize to all other processes
+
+}
+
+/* Destructor
+ */
+SharedClass::~SharedClass() {
+  // Send all the other processes the objectID. 
+  // We take the locks before we return.
+
+  objLock.lock();
+  if (getpid() == ownerPID) {
+    objCommonLock.lock();
+  }
+}
+
+/* Override for new
+ */
+void* SharedClass::operator new (size_t size)
+{
+    // We take this lock, and release it in the constructor
+  createLock.lock();
+  memAlloc = size;
+  SharedClass *ptr = (SharedClass *) malloc(size);
+  return ptr;
+}
+
+/* Override for delete. Straightforward
+ */
+void SharedClass::operator delete (void *p) {
+  free(p);
 }
 
 /* This is called at the beginning of every setter. It behaves differently for
  * owners and for other processes.
  */
-void sharedClass::startWrite() {
+void SharedClass::startWrite() {
   objLock.lock();
-  if (ownerPID == sharedClass::ownPID) {
+  if (ownerPID == SharedClass::ownPID) {
     // We are the owner of this object
     objCommonLock.lock();
   } else {
@@ -33,8 +119,8 @@ void sharedClass::startWrite() {
 /* This is called at the end of every setter. It behaves differently for
  * owners and for other processes.
  */
-void sharedClass::stopWrite() {
-  if (ownerPID == sharedClass::ownPID) {
+void SharedClass::stopWrite() {
+  if (ownerPID == SharedClass::ownPID) {
     // We are the owner of this object
     objCommonLock.unlock();
   } else {
@@ -46,13 +132,13 @@ void sharedClass::stopWrite() {
 
 /* This is called at the beginning of every getter.
  */
-void sharedClass::startRead() {
+void SharedClass::startRead() {
   objLock.lock();
 }
 
 /* This is called at the end of every getter.
  */
-void sharedClass::stopRead() {
+void SharedClass::stopRead() {
   objLock.unlock();
 }
 
@@ -64,7 +150,7 @@ void sharedClass::stopRead() {
  * @param size   The size of the item in bytes
  * @param data   The actual value to be stored in the item
  */
-void sharedClass::sharedWrite(unsigned int offset, unsigned int size, 
+void SharedClass::sharedWrite(unsigned int offset, unsigned int size, 
                               void *data) {
   for (int i = 0, n = pidList.size(); i < n; i++) {
     // TODO send to every other process on the list the objectID, the offset, 
@@ -74,7 +160,7 @@ void sharedClass::sharedWrite(unsigned int offset, unsigned int size,
 
 /* This function obtains the lock for this object at the owner
  */
-void sharedClass::getLockAtOwner() {
+void SharedClass::getLockAtOwner() {
   responseLock.lock();
   // Send a get lock message to the owner. We need to send the object ID to the
   // port that the owner is listening at
@@ -89,7 +175,7 @@ void sharedClass::getLockAtOwner() {
 
 /* This function releases the lock for this object at the owner
  */
-void sharedClass::releaseLockAtOwner() {
+void SharedClass::releaseLockAtOwner() {
     responseLock.lock();
   // Send a release lock message to the owner. We need to send the object ID to the
   // port that the owner is listening at
@@ -100,10 +186,4 @@ void sharedClass::releaseLockAtOwner() {
   // the owner responds
   responseLock.lock();
   responseLock.unlock();
-}
-
-int main () {
-  sharedClass obj;
-
-  obj.test();
 }

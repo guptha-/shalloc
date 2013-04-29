@@ -1,5 +1,5 @@
-#ifndef SHALLOCLIB_H
-#define SHALLOCLIB_H
+#ifndef SHALLOCLIB_HPP
+#define SHALLOCLIB_HPP
 
 #include <iostream>
 #include <unordered_map>
@@ -7,13 +7,17 @@
 #include <unistd.h>
 #include <mutex>
 #include <vector>
+#include <ctime>
+#include <atomic>
+#include <unordered_set>
 using namespace std;
 
 namespace shalloclib {
+
   typedef unordered_map<unsigned int, void *> ObjIdLocMap;
   typedef unordered_map<pid_t, unsigned short int> PidPortMap;
 
-  class sharedClass {
+  class SharedClass {
       // This contains the owner process ID of the shared DS
     pid_t ownerPID;
 
@@ -46,8 +50,15 @@ namespace shalloclib {
       // The holder of the common lock
     pid_t holderPID;
 
+      // Maximum known objectID
+    static unsigned int maxObjectID;
+
+      // Size of the derived object
+    unsigned int objectSize;
+
     void getLockAtOwner();
     void releaseLockAtOwner();
+    SharedClass(unsigned int objectID, pid_t ownerPID);
 
   protected:
       // This is called at the beginning of every setter
@@ -61,16 +72,20 @@ namespace shalloclib {
       // This is called in every setter
     void sharedWrite(unsigned int offset, unsigned int size, void *data);
 
+  public:
     static void* operator new (size_t size); 
     static void operator delete (void *p);
-
-  public:
+    SharedClass();
+    ~SharedClass();
+    int val;
 
       // This contains this process's PID
     static pid_t ownPID;
 
       // The list of processes that share the data structure
-    static vector<unsigned int> pidList;
+    static vector<pid_t> pidList;
+
+    static ObjIdLocMap objIdLocMap;
 
     void test();
   };
