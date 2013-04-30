@@ -4,7 +4,7 @@ using namespace shalloclib;
 
 pid_t SharedClass::ownPID = getpid();
 vector<pid_t> SharedClass::pidList;
-//ObjIdLocMap SharedClass::objIdLocMap;
+ObjIdLocMap SharedClass::objIdLocMap;
 unsigned int SharedClass::maxObjectID(0);
   // Just for creation of subclasses
 static mutex createLock;
@@ -32,34 +32,19 @@ SharedClass::SharedClass() {
   // Other creations can proceed
   createLock.unlock();
 
-  // TODO find out why the seg fault occurs
-  // typedef unordered_map<int, int> MyObjIdLocMap;
-  // MyObjIdLocMap myObjIdLocMap;
-  // int a = 5;
-  // int b = 6;
-
-  // pair<MyObjIdLocMap::iterator, bool> notAlreadyExists;
-  // notAlreadyExists = myObjIdLocMap.emplace(a, b);
-  // if (get<1>(notAlreadyExists) != true)
-  // { 
-  //   cout<<"Exists"<<endl;
-  // }
-  // cout<<"Not Exists"<<endl;
-
-
-  // while (true == true) {
-  //   unsigned int objectID = ++maxObjectID;
-  //   this->objLock.lock();
-  //   pair<ObjIdLocMap::iterator, bool> notAlreadyExists;
-  //   int a = 5;
-  //   notAlreadyExists = objIdLocMap.emplace(objectID, &a);
-  //   if (get<1>(notAlreadyExists) != true)
-  //   {
-  //       // The entry already exists
-  //     continue;
-  //   }
-  //   break;
-  // }
+  while (true == true) {
+    unsigned int objectID = ++maxObjectID;
+    this->objLock.lock();
+    pair<ObjIdLocMap::iterator, bool> notAlreadyExists;
+    int a = 5;
+    notAlreadyExists = objIdLocMap.emplace(objectID, &a);
+    if (get<1>(notAlreadyExists) != true)
+    {
+        // The entry already exists
+      continue;
+    }
+    break;
+  }
 
   objectID = memSize; // TODO
   SharedClass(objectID, getpid());

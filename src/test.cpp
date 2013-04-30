@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../inc/shalloclib.h"
+#include "../lib/shalloclib.hpp"
 
 class Test : public shalloclib::SharedClass {
 public:
