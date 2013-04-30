@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <mutex>
 #include <vector>
+#include <csignal>
+#include <syscall.h>
 
 using namespace std;
 
@@ -39,5 +41,8 @@ namespace shalloclib {
 
     void test();
   };
+
+  int pthread_create (pthread_t * tid, const pthread_attr_t * attr, 
+    void *(*fn)   (void *), void * arg);
 }
 #endif

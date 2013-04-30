@@ -9,7 +9,8 @@
 #include <vector>
 #include <ctime>
 #include <atomic>
-#include <unordered_set>
+#include <csignal>
+#include <syscall.h>
 using namespace std;
 
 namespace shalloclib {
@@ -75,7 +76,7 @@ namespace shalloclib {
   public:
     static void* operator new (size_t size); 
     static void operator delete (void *p);
-    SharedClass();
+    SharedClass();  
     ~SharedClass();
     int val;
 
@@ -89,6 +90,8 @@ namespace shalloclib {
 
     void test();
   };
+  int pthread_create (pthread_t * tid, const pthread_attr_t * attr, 
+                      void *(*fn)   (void *), void * arg);
 }
 
 #endif

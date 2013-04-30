@@ -4,7 +4,7 @@ using namespace shalloclib;
 
 pid_t SharedClass::ownPID = getpid();
 vector<pid_t> SharedClass::pidList;
-ObjIdLocMap SharedClass::objIdLocMap;
+//ObjIdLocMap SharedClass::objIdLocMap;
 unsigned int SharedClass::maxObjectID(0);
   // Just for creation of subclasses
 static mutex createLock;
@@ -33,13 +33,13 @@ SharedClass::SharedClass() {
   createLock.unlock();
 
   // TODO find out why the seg fault occurs
-  // typedef unordered_set<int> MyObjIdLocMap;
+  // typedef unordered_map<int, int> MyObjIdLocMap;
   // MyObjIdLocMap myObjIdLocMap;
   // int a = 5;
   // int b = 6;
 
   // pair<MyObjIdLocMap::iterator, bool> notAlreadyExists;
-  // notAlreadyExists = myObjIdLocMap.emplace(b);
+  // notAlreadyExists = myObjIdLocMap.emplace(a, b);
   // if (get<1>(notAlreadyExists) != true)
   // { 
   //   cout<<"Exists"<<endl;
@@ -186,4 +186,18 @@ void SharedClass::releaseLockAtOwner() {
   // the owner responds
   responseLock.lock();
   responseLock.unlock();
+}
+
+int pthread_create (pthread_t * tid, const pthread_attr_t * attr, 
+  void *(*fn)   (void *), void * arg) {
+  cout<<"In pthread_create"<<endl;
+  int child = syscall(SYS_clone, CLONE_FS | CLONE_FILES | SIGCHLD, (void*) 0);
+  
+  if (child) {
+    cout<<"Child"<<endl;
+    return 0;
+  } else {
+   cout<<"Parent"<<endl;
+   return 0;
+ }
 }
