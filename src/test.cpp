@@ -15,6 +15,7 @@ void *thrfunc (void *a) {
 }
 
 int main() {
+  shalloclib::initState();
   Test *obj = new Test();
   obj->value = 5;
   obj->val = 10;

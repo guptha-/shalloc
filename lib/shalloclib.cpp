@@ -25,6 +25,9 @@ static mutex createLock;
   // constructor does not know the size allocated for the subclass object.
 size_t memAlloc;
 
+  // Just for waiting till listen thread is initialized
+static mutex listenLock;
+
 
 /* Constructor
  * @param objectID the unique ID for this particular object
@@ -187,7 +190,7 @@ void SharedClass::releaseLockAtOwner() {
 
 int shalloclib::sthread_create (pthread_t * tid, const pthread_attr_t * attr, 
                     void *(*fn)   (void *), void * arg) {
-  cout<<"In pthread_create"<<endl;
+  cout<<"In sthread_create"<<endl;
   // TODO manipulate arg to assign port ID
 
   int child = syscall(SYS_clone, CLONE_FS | CLONE_FILES | SIGCHLD, (void*) 0);
@@ -209,10 +212,6 @@ void shalloclib::initState() {
   SharedClass::initState();
   srand(time(NULL));
   ThreadArg::maxAssignedPort = 10000;
-  unsigned int listenerPort = ThreadArg::maxAssignedPort++;
-  pthread_t listThread;
-  pthread_create(&listThread, NULL, &listenerFlow, (void *) listenerPort);
-
 }
 
 /* Initialization for SharedClass statics
@@ -220,12 +219,19 @@ void shalloclib::initState() {
 void SharedClass::initState() {
   SharedClass::ownPID = getpid();
   SharedClass::maxObjectID = 0;
-  while (true == true) {
-    SharedClass::portID = ThreadArg::maxAssignedPort++;
-  }
+  SharedClass::portID = ThreadArg::maxAssignedPort++;
+  pthread_t listThread;
+  cout<<"Before pthread_create"<<endl;
+  listenLock.lock();
+  pthread_create(&listThread, NULL, &listenerFlow, (void *) SharedClass::portID);
+  pthread_detach(listThread);
+  listenLock.lock();
+  listenLock.unlock();
+  cout<<"after final unlock"<<endl;
 }
 
 void *shalloclib::listenerFlow(void *arg) {
+  cout<<"listener flow"<<endl;
   UDPSocket listenSocket ((unsigned int) arg);
 
   while (true) {
@@ -234,9 +240,14 @@ void *shalloclib::listenerFlow(void *arg) {
     char *inMsg;
     inMsg = new char[1000]();
     try {
+      cout<<"before recv unlock"<<endl;
+      listenLock.unlock();
+      cout<<"on recv"<<endl;
       inMsgSize = listenSocket.recv(inMsg, 1000);
+      cout<<"after recv"<<endl;
     } catch (SocketException &e) {
-      cout<<"Bird: "<<e.what()<<endl;
+      cout<<"Process "<<e.what()<<endl;
+      return NULL;
     }
     inMsg[inMsgSize] = '\0';
   }
