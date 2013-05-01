@@ -11,6 +11,7 @@
 #include <atomic>
 #include <csignal>
 #include <syscall.h>
+#include "PracticalSocket.h"
 using namespace std;
 
 namespace shalloclib {
@@ -52,10 +53,21 @@ namespace shalloclib {
     pid_t holderPID;
 
       // Maximum known objectID
-    static unsigned int maxObjectID;
+    static atomic<unsigned int> maxObjectID;
 
       // Size of the derived object
     unsigned int objectSize;
+
+      // This contains this process's PID
+    static pid_t ownPID;
+
+      // This is the own port ID on which the process listens
+    static unsigned int portID;
+
+      // The list of processes that share the data structure
+    static vector<pid_t> pidList;
+
+    static ObjIdLocMap objIdLocMap;
 
     void getLockAtOwner();
     void releaseLockAtOwner();
@@ -74,24 +86,26 @@ namespace shalloclib {
     void sharedWrite(unsigned int offset, unsigned int size, void *data);
 
   public:
+    int val;
+
     static void* operator new (size_t size); 
     static void operator delete (void *p);
     SharedClass();  
     ~SharedClass();
-    int val;
-
-      // This contains this process's PID
-    static pid_t ownPID;
-
-      // The list of processes that share the data structure
-    static vector<pid_t> pidList;
-
-    static ObjIdLocMap objIdLocMap;
+    static void initState();
 
     void test();
   };
-  int pthread_create (pthread_t * tid, const pthread_attr_t * attr, 
+
+  class ThreadArg {
+    public:
+    static atomic<unsigned int> maxAssignedPort;
+    unsigned int portNumber;
+  };
+  void initState();
+  int sthread_create (pthread_t * tid, const pthread_attr_t * attr, 
                       void *(*fn)   (void *), void * arg);
+  void *listenerFlow(void *arg);
 }
 
 #endif

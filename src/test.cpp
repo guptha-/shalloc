@@ -23,6 +23,6 @@ int main() {
   pthread_t thread1;
   int a = 5;
 
-  pthread_create (&thread1, NULL, &thrfunc, (void *) &a);
+  shalloclib::sthread_create (&thread1, NULL, &thrfunc, (void *) &a);
   return 0;
 }

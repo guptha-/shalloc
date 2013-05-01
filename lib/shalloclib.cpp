@@ -2,17 +2,29 @@
 
 using namespace shalloclib;
 
-pid_t SharedClass::ownPID = getpid();
+// STATIC VARIABLES========================================
+  // Maximum known objectID
+atomic<unsigned int> SharedClass::maxObjectID;
+  // This contains this process's PID
+pid_t SharedClass::ownPID;
+  // This is the own port ID on which the process listens
+unsigned int SharedClass::portID;
+  // The list of processes that share the data structure
 vector<pid_t> SharedClass::pidList;
 ObjIdLocMap SharedClass::objIdLocMap;
-unsigned int SharedClass::maxObjectID(0);
+
+atomic<unsigned int> ThreadArg::maxAssignedPort;
+
+// END STATIC VARIABLES====================================
+
   // Just for creation of subclasses
 static mutex createLock;
-  // The size of memory allocated. This is a temporary storage, 
+  // The size of memory allocated. This is a temporary store, 
   // meaningful between the time memory is allocated by the new operator,
   // and the base class constructor is called. This is used because the baseclass
   // constructor does not know the size allocated for the subclass object.
 size_t memAlloc;
+
 
 /* Constructor
  * @param objectID the unique ID for this particular object
@@ -33,7 +45,7 @@ SharedClass::SharedClass() {
   createLock.unlock();
 
   while (true == true) {
-    unsigned int objectID = ++maxObjectID;
+    unsigned int objectID = ++SharedClass::maxObjectID;
     this->objLock.lock();
     pair<ObjIdLocMap::iterator, bool> notAlreadyExists;
     int a = 5;
@@ -46,8 +58,8 @@ SharedClass::SharedClass() {
     break;
   }
 
-  objectID = memSize; // TODO
-  SharedClass(objectID, getpid());
+  objectSize = memSize;
+  SharedClass(objectID, SharedClass::ownPID);
 
   // TODO send objectID, pid and memSize to all other processes
 
@@ -60,7 +72,7 @@ SharedClass::~SharedClass() {
   // We take the locks before we return.
 
   objLock.lock();
-  if (getpid() == ownerPID) {
+  if (ownPID == ownerPID) {
     objCommonLock.lock();
   }
 }
@@ -173,9 +185,11 @@ void SharedClass::releaseLockAtOwner() {
   responseLock.unlock();
 }
 
-int pthread_create (pthread_t * tid, const pthread_attr_t * attr, 
-  void *(*fn)   (void *), void * arg) {
+int shalloclib::sthread_create (pthread_t * tid, const pthread_attr_t * attr, 
+                    void *(*fn)   (void *), void * arg) {
   cout<<"In pthread_create"<<endl;
+  // TODO manipulate arg to assign port ID
+
   int child = syscall(SYS_clone, CLONE_FS | CLONE_FILES | SIGCHLD, (void*) 0);
   
   if (child) {
@@ -185,4 +199,46 @@ int pthread_create (pthread_t * tid, const pthread_attr_t * attr,
    cout<<"Parent"<<endl;
    return 0;
  }
+}
+
+/* This function should be called as soon as the program begins
+ * execution, before doing anything with SharedClass or creating
+ * threads.
+ */
+void shalloclib::initState() {
+  SharedClass::initState();
+  srand(time(NULL));
+  ThreadArg::maxAssignedPort = 10000;
+  unsigned int listenerPort = ThreadArg::maxAssignedPort++;
+  pthread_t listThread;
+  pthread_create(&listThread, NULL, &listenerFlow, (void *) listenerPort);
+
+}
+
+/* Initialization for SharedClass statics
+ */
+void SharedClass::initState() {
+  SharedClass::ownPID = getpid();
+  SharedClass::maxObjectID = 0;
+  while (true == true) {
+    SharedClass::portID = ThreadArg::maxAssignedPort++;
+  }
+}
+
+void *shalloclib::listenerFlow(void *arg) {
+  UDPSocket listenSocket ((unsigned int) arg);
+
+  while (true) {
+    // Block for msg receipt
+    int inMsgSize;
+    char *inMsg;
+    inMsg = new char[1000]();
+    try {
+      inMsgSize = listenSocket.recv(inMsg, 1000);
+    } catch (SocketException &e) {
+      cout<<"Bird: "<<e.what()<<endl;
+    }
+    inMsg[inMsgSize] = '\0';
+  }
+  return NULL;
 }
