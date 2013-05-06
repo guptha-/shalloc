@@ -1,14 +1,12 @@
 DFLAG = -g
 WFLAG = -Wall
 C11FLAG = -std=c++0x
-THREADFLAG = -pthread
+THREADFLAG = -pthread -lrt
 
-INCL = lib/shalloclib.hpp\
-       lib/PracticalSocket.h
+INCL = lib/shalloclib.hpp
 
 OBJL = obj/test.o\
-       obj/shalloclib.o\
-       obj/PracticalSocket.o
+       obj/shalloclib.o
 
 CREATEDIR = mkdir -p obj bin
 
@@ -25,10 +23,6 @@ obj/test.o: src/test.cpp $(INCL)
 test: $(OBJL) $(INCL)
 	$(CREATEDIR)
 	g++ -o bin/test $(OBJL) $(C11FLAG) $(WFLAG) $(DFLAG) -lm $(THREADFLAG)
-
-obj/PracticalSocket.o: lib/PracticalSocket.cpp $(INCL)
-	$(CREATEDIR)
-	g++ -c lib/PracticalSocket.cpp -I inc $(C11FLAG) $(WFLAG) $(DFLAG) -o obj/PracticalSocket.o
 
 clean:
 	rm -rf bin obj
