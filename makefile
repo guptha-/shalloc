@@ -5,24 +5,33 @@ THREADFLAG = -pthread -lrt
 
 INCL = lib/shalloclib.hpp
 
-OBJL = obj/test.o\
-       obj/shalloclib.o
+OBJL = obj/shalloclib.o
 
-CREATEDIR = mkdir -p obj bin
+CREATEDIR = mkdir -p obj bin test/recent
 
-all: test
+all: testmain test1 test2
+
+testmain: test/test.cpp
+	$(CREATEDIR)
+	g++ -o bin/test test/test.cpp
 
 obj/shalloclib.o: lib/shalloclib.cpp $(INCL)
 	$(CREATEDIR)
 	g++ -c lib/shalloclib.cpp $(C11FLAG) $(WFLAG) $(DFLAG) -o obj/shalloclib.o
 
-obj/test.o: src/test.cpp $(INCL)
+obj/test1.o: src/test1.cpp $(INCL)
 	$(CREATEDIR)
-	g++ -c src/test.cpp $(C11FLAG) $(WFLAG) $(DFLAG) -o obj/test.o
+	g++ -c src/test1.cpp $(C11FLAG) $(WFLAG) $(DFLAG) -o obj/test1.o
+test1: obj/test1.o $(OBJL) $(INCL)
+	$(CREATEDIR)
+	g++ -o bin/test1 obj/test1.o $(OBJL) $(C11FLAG) $(WFLAG) $(DFLAG) -lm $(THREADFLAG)
 
-test: $(OBJL) $(INCL)
+obj/test2.o: src/test2.cpp $(INCL)
 	$(CREATEDIR)
-	g++ -o bin/test $(OBJL) $(C11FLAG) $(WFLAG) $(DFLAG) -lm $(THREADFLAG)
+	g++ -c src/test2.cpp $(C11FLAG) $(WFLAG) $(DFLAG) -o obj/test2.o
+test2: obj/test2.o $(OBJL) $(INCL)
+	$(CREATEDIR)
+	g++ -o bin/test2 obj/test2.o $(OBJL) $(C11FLAG) $(WFLAG) $(DFLAG) -lm $(THREADFLAG)
 
 clean:
 	rm -rf bin obj

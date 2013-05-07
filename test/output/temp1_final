@@ -1,0 +1,10 @@
+Starting test case 1
+Parent: Obj 1->a 5
+Parent: Obj 2->a 6
+Child: Arg is 3
+Child: Obj 1->a 7
+Child: Obj 2->a 6
+Parent: Obj 2->a 8
+Parent: Obj 3->a 11
+Parent: updating obj3
+Child: Obj 3->a 12

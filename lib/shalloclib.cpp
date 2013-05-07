@@ -14,7 +14,7 @@ using namespace shalloclib;
 /* STATICS */
 static bool *memPoolBitmap;
 static void *memPoolBasePtr;
-static mutex memPoolLock;
+static pthread_mutex_t memPoolLock;
 /* END STATICS */
 
 /* ===  FUNCTION  ==============================================================
@@ -39,10 +39,10 @@ SharedClass::SharedClass ()
  */
 void* SharedClass::operator new (size_t size)
 {   
-  memPoolLock.lock();
+  pthread_mutex_lock(&memPoolLock);
   if (size > BLOCK_SIZE) {
     cout<<"Trying to allocate memory larger than BLOCK_SIZE. Tune that!"<<endl;
-    memPoolLock.unlock();
+    pthread_mutex_unlock(&memPoolLock);
   }
   void *ptr = NULL;
   for (int i = 0; i < NUMBER_OF_BLOCKS; i++) {
@@ -57,7 +57,7 @@ void* SharedClass::operator new (size_t size)
   if (ptr == NULL) {
     cout<<"The mem pool is full. Try increasing NUMBER_OF_BLOCKS!"<<endl;
   }
-  memPoolLock.unlock();
+  pthread_mutex_unlock(&memPoolLock);
   return ptr;
 }		/* -----  end of function operator new  ----- */
 
@@ -67,13 +67,24 @@ void* SharedClass::operator new (size_t size)
  * =============================================================================
  */
 void SharedClass::operator delete (void *p) {
-  memPoolLock.lock();
+  pthread_mutex_lock(&memPoolLock);
   char *tempObjPtr = (char *)p;
   char *tempBasePtr = (char *)memPoolBasePtr;
   int i = (tempObjPtr - tempBasePtr) / BLOCK_SIZE;
   memPoolBitmap[i] = false;
-  memPoolLock.unlock();
+  pthread_mutex_lock(&memPoolLock);
 }		/* -----  end of function operator delete  ----- */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  sigHandler
+ *  Description:  Signal handler for SIGCHLD
+ * =============================================================================
+ */
+static void sigHandler (int signo)
+{
+  cout<<"In sig handler"<<endl;
+  return;
+}		/* -----  end of function sigHandler  ----- */
 
 /* ===  FUNCTION  ==============================================================
  *         Name:  initState
@@ -84,6 +95,12 @@ void SharedClass::operator delete (void *p) {
  */
 void shalloclib::initState ()
 {
+  pthread_mutexattr_t m_attr;
+  pthread_mutexattr_init(&m_attr);
+  pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&(memPoolLock), &m_attr);
+  pthread_mutexattr_destroy(&m_attr);
+
   srand(time(NULL));
   int key = rand();
   int size = BLOCK_SIZE * NUMBER_OF_BLOCKS;
@@ -111,7 +128,11 @@ void shalloclib::initState ()
   }
   memset (memPoolBitmap, 0, NUMBER_OF_BLOCKS / 8 + 1);
   memPoolBitmap[0] = true;
-  cout<<"Mempoolbitmap "<<memPoolBitmap<<endl;
+
+  // Registering signal handler for SIGCHLD
+  //if (signal(SIGCHLD, sigHandler) == SIG_ERR) {
+  //  cout<<"Cannot register signal handler. Zombies may be created!"<<endl;
+  //}
   return;
 }		/* -----  end of function initState  ----- */
 
@@ -133,11 +154,22 @@ int shalloclib::sthread_create (void *(*fn) (void *), void * arg)
     cout<<"Problem forking!"<<endl;
     exit(1);
   }
-  if (childId != 0) {
+  if (childId == 0) {
     // This is the child. Call the given function with the argument
-    cout<<"In child"<<endl;
     (*fn)(arg);
     exit(0);
   }
   return childId;
 }		/* -----  end of function sthread_create  ----- */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  pthread_join
+ *  Description:  Waits for given process to terminate
+ * =============================================================================
+ */
+void shalloclib::sthread_join (int pid)
+{
+  waitpid(pid, NULL, 0);
+  return;
+}		/* -----  end of function pthread_join  ----- */
+

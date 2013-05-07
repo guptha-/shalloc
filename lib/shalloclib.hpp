@@ -8,13 +8,14 @@
  */
 
 #include <iostream>
-#include <mutex>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #define BLOCK_SIZE 128
 #define NUMBER_OF_BLOCKS 100
@@ -33,4 +34,5 @@ namespace shalloclib {
 
   void initState();
   int sthread_create (void *(*fn)   (void *), void * arg);
+  void sthread_join (int pid);
 }
