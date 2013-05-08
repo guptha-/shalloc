@@ -1,3 +1,5 @@
+// Tests the sharing of objects amongst processes. Also tests that the child is
+// able to create a shared object that is accessible by the parent
 #include <iostream>
 #include "../lib/shalloclib.hpp"
 
@@ -39,7 +41,6 @@ void *fn(void *arg) {
 }
 
 int main() {
-  initState();
   cout<<"Starting test case 1"<<endl;
   obj = new Obj();
   obj->obj1 = new Test();
@@ -56,7 +57,7 @@ int main() {
   
   // A: Lock obj1, making the child wait till released
   pthread_mutex_lock(&obj->obj1->lock);
-  int childPid = sthread_create(fn, (void *) &a);
+  sthread_create(fn, (void *) &a);
   usleep(10000);
   obj->obj1->a = 7;
   // C: Release lock so that child can now access obj1 updated

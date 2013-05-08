@@ -12,10 +12,124 @@
 using namespace shalloclib;
 
 /* STATICS */
-static bool *memPoolBitmap;
-static void *memPoolBasePtr;
-static pthread_mutex_t memPoolLock;
+
+static MemPool *memPoolOne = new MemPool(BLOCK_SIZE_ONE, NUMBER_BLOCKS_ONE);
+static MemPool *memPoolTwo = new MemPool(BLOCK_SIZE_TWO, NUMBER_BLOCKS_TWO);
+static MemPool *memPoolThree = new MemPool(BLOCK_SIZE_THREE, NUMBER_BLOCKS_THREE);
 /* END STATICS */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  MemPool
+ *  Description:  Constructor for MemPool
+ * =============================================================================
+ */
+MemPool::MemPool (int blockSz, int numberBlks)
+{
+  blockSize = blockSz;
+  numberBlocks = numberBlks;
+
+  static bool firstCall = false;
+  if (firstCall == false) {
+    firstCall = true;
+    srand(time(NULL));
+  }
+  pthread_mutexattr_t m_attr;
+  pthread_mutexattr_init(&m_attr);
+  pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&(lock), &m_attr);
+  pthread_mutexattr_destroy(&m_attr);
+
+  int key = rand();
+  int size = blockSz * numberBlks + 1;
+  char keyStr[20];
+  sprintf(keyStr, "%d", key);
+  int shmid = shm_open(keyStr, O_RDWR | O_CREAT, 0666);
+  if (shmid == -1) {
+    cout<<"shm_open failed!"<<endl;
+    exit(1);
+  }
+  ftruncate(shmid, size);
+  basePtr = mmap((caddr_t)0, size, PROT_READ | PROT_WRITE, 
+                        MAP_SHARED, shmid, 0);
+  if (basePtr == (caddr_t)(-1)) {
+    cout<<"Error in mmap"<<endl;
+    exit(1);
+  }
+
+  // Allocating the status of the heap in the heap
+  status = (bool *) basePtr;
+  if ((numberBlks * sizeof(bool) > (unsigned int)blockSz)) {
+    cout<<"Not enough space in one block to store the bitmap. "
+          "Increase block size"<<endl;
+    exit(1);
+  }
+  memset (status, 0, numberBlks * sizeof(bool));
+  status[0] = true;
+
+  return;
+}		/* -----  end of function MemPool  ----- */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  getBlock
+ *  Description:  Gets a block from the mem pool if possible
+ * =============================================================================
+ */
+void *MemPool::getBlock ()
+{
+  pthread_mutex_lock(&lock);
+  void *ptr = NULL;
+  for (int i = 0; i < numberBlocks + 1; i++) {
+    if (status[i] == false) {
+      // This memory location is unoccupied
+      status[i] = true;
+      char *tempPtr = (char *)basePtr;
+      ptr = (void *) (tempPtr + blockSize * sizeof(bool) * i);
+      break;
+    }
+  }
+  if (ptr == NULL) {
+    cout<<"The mem pool is full. Try increasing the number of blocks in this "
+      "pool with size "<<blockSize<<"!"<<endl;
+  }
+  pthread_mutex_unlock(&lock);
+  return ptr;
+}		/* -----  end of function getBlock  ----- */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  deleteBlock
+ *  Description:  Frees up the given block
+ * =============================================================================
+ */
+void MemPool::destroyBlock (void *p)
+{
+  pthread_mutex_lock(&lock);
+  char *tempObjPtr = (char *)p;
+  char *tempBasePtr = (char *)basePtr;
+  int i = (tempObjPtr - tempBasePtr) / (blockSize * sizeof(bool));
+  status[i] = false;
+  pthread_mutex_unlock(&lock);
+  return;
+}		/* -----  end of function deleteBlock  ----- */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  addrWithinRange
+ *  Description:  Checks if the given address is within the purview of this 
+ *                mem pool
+ * =============================================================================
+ */
+bool MemPool::addrWithinRange (void *p)
+{
+  pthread_mutex_lock(&lock);
+  char *tempObjPtr = (char *)p;
+  char *tempBasePtr = (char *)basePtr;
+  int i = (tempObjPtr - tempBasePtr) / (blockSize * sizeof(bool));
+  int align = (tempObjPtr - tempBasePtr) % (blockSize * sizeof(bool));
+  pthread_mutex_unlock(&lock);
+  if ((i < 0) || (i > numberBlocks) || (align != 0)) {
+    return false;
+  }
+  return true;
+}		/* -----  end of function addrWithinRange  ----- */
 
 /* ===  FUNCTION  ==============================================================
  *         Name:  SharedClass
@@ -27,7 +141,7 @@ SharedClass::SharedClass ()
   pthread_mutexattr_t m_attr;
   pthread_mutexattr_init(&m_attr);
   pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED);
-  pthread_mutex_init(&(this->lock), &m_attr);
+  pthread_mutex_init(&(lock), &m_attr);
   pthread_mutexattr_destroy(&m_attr);
   return;
 }		/* -----  end of function SharedClass  ----- */
@@ -37,29 +151,21 @@ SharedClass::SharedClass ()
  *  Description:  Override for the new operator for this class and subclasses
  * =============================================================================
  */
-void* SharedClass::operator new (size_t size)
+void* SharedClass::operator new (size_t size) throw()
 {   
-  pthread_mutex_lock(&memPoolLock);
-  if (size > BLOCK_SIZE) {
-    cout<<"Trying to allocate memory larger than BLOCK_SIZE. Tune that!"<<endl;
-    pthread_mutex_unlock(&memPoolLock);
-    exit(1);
+  // Find which memPool the block should go into
+  if (size <= BLOCK_SIZE_ONE) {
+    return memPoolOne->getBlock();
   }
-  void *ptr = NULL;
-  for (int i = 0; i < NUMBER_OF_BLOCKS; i++) {
-    if (memPoolBitmap[i] == false) {
-      // This memory location is unoccupied
-      memPoolBitmap[i] = true;
-      char *tempPtr = (char *)memPoolBasePtr;
-      ptr = (void *) (tempPtr + BLOCK_SIZE * sizeof(bool) * i);
-      break;
-    }
+  if (size <= BLOCK_SIZE_TWO) {
+    return memPoolTwo->getBlock();
   }
-  if (ptr == NULL) {
-    cout<<"The mem pool is full. Try increasing NUMBER_OF_BLOCKS!"<<endl;
+  if (size <= BLOCK_SIZE_THREE) {
+    return memPoolThree->getBlock();
   }
-  pthread_mutex_unlock(&memPoolLock);
-  return ptr;
+  cout<<"Trying to allocate memory larger than maximum block size. Tune that!"<<
+    endl;
+  return NULL;
 }		/* -----  end of function operator new  ----- */
 
 /* ===  FUNCTION  ==============================================================
@@ -68,74 +174,21 @@ void* SharedClass::operator new (size_t size)
  * =============================================================================
  */
 void SharedClass::operator delete (void *p) {
-  pthread_mutex_lock(&memPoolLock);
-  char *tempObjPtr = (char *)p;
-  char *tempBasePtr = (char *)memPoolBasePtr;
-  int i = (tempObjPtr - tempBasePtr) / (BLOCK_SIZE * sizeof(bool));
-  memPoolBitmap[i] = false;
-  pthread_mutex_unlock(&memPoolLock);
+  if (memPoolOne->addrWithinRange(p) == true) {
+    memPoolOne->destroyBlock(p);
+    return;
+  }
+  if (memPoolTwo->addrWithinRange(p) == true) {
+    memPoolTwo->destroyBlock(p);
+    return;
+  }
+  if (memPoolThree->addrWithinRange(p) == true) {
+    memPoolThree->destroyBlock(p);
+    return;
+  }
+  cout<<"Trying to delete something not in the shared memory"<<endl;
+  return;
 }		/* -----  end of function operator delete  ----- */
-
-/* ===  FUNCTION  ==============================================================
- *         Name:  sigHandler
- *  Description:  Signal handler for SIGCHLD
- * =============================================================================
- */
-static void sigHandler (int signo)
-{
-  cout<<"In sig handler"<<endl;
-  return;
-}		/* -----  end of function sigHandler  ----- */
-
-/* ===  FUNCTION  ==============================================================
- *         Name:  initState
- *  Description:  Should be called as soon as the program starts up, before
- *                trying to create threads or extending SharedClass. Sets up the
- *                shared memory pool.
- * =============================================================================
- */
-void shalloclib::initState ()
-{
-  pthread_mutexattr_t m_attr;
-  pthread_mutexattr_init(&m_attr);
-  pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED);
-  pthread_mutex_init(&(memPoolLock), &m_attr);
-  pthread_mutexattr_destroy(&m_attr);
-
-  srand(time(NULL));
-  int key = rand();
-  int size = BLOCK_SIZE * NUMBER_OF_BLOCKS;
-  char keyStr[20];
-  sprintf(keyStr, "%d", key);
-  int shmid = shm_open(keyStr, O_RDWR | O_CREAT, 0666);
-  if (shmid == -1) {
-    cout<<"shm_open failed!"<<endl;
-    exit(1);
-  }
-  ftruncate(shmid, size);
-  memPoolBasePtr = mmap((caddr_t)0, size, PROT_READ | PROT_WRITE, 
-                            MAP_SHARED, shmid, 0);
-  if (memPoolBasePtr == (caddr_t)(-1)) {
-    cout<<"Error in mmap"<<endl;
-    exit(1);
-  }
-
-  // Allocating the bitmap of the heap in the heap
-  memPoolBitmap = (bool *)memPoolBasePtr;
-  if ((NUMBER_OF_BLOCKS * sizeof(bool) > BLOCK_SIZE) {
-    cout<<"Not enough space in one block to store the bitmap. "
-          "Increase BLOCK_SIZE"<<endl;
-    exit(1);
-  }
-  memset (memPoolBitmap, 0, NUMBER_OF_BLOCKS * sizeof(bool));
-  memPoolBitmap[0] = true;
-
-  // Registering signal handler for SIGCHLD
-  //if (signal(SIGCHLD, sigHandler) == SIG_ERR) {
-  //  cout<<"Cannot register signal handler. Zombies may be created!"<<endl;
-  //}
-  return;
-}		/* -----  end of function initState  ----- */
 
 /* ===  FUNCTION  ==============================================================
  *         Name:  sthread_create

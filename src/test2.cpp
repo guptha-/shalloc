@@ -1,3 +1,4 @@
+// Tests sthread_join
 #include <iostream>
 #include "../lib/shalloclib.hpp"
 
@@ -21,7 +22,6 @@ void *fn2(void *arg) {
 }
 
 int main() {
-  initState();
   cout<<"Starting test case 2"<<endl;
   int a = 5;
   int childPid = sthread_create(fn1, (void *) &a);
