@@ -43,6 +43,7 @@ void* SharedClass::operator new (size_t size)
   if (size > BLOCK_SIZE) {
     cout<<"Trying to allocate memory larger than BLOCK_SIZE. Tune that!"<<endl;
     pthread_mutex_unlock(&memPoolLock);
+    exit(1);
   }
   void *ptr = NULL;
   for (int i = 0; i < NUMBER_OF_BLOCKS; i++) {
@@ -50,7 +51,7 @@ void* SharedClass::operator new (size_t size)
       // This memory location is unoccupied
       memPoolBitmap[i] = true;
       char *tempPtr = (char *)memPoolBasePtr;
-      ptr = (void *) (tempPtr + BLOCK_SIZE * i);
+      ptr = (void *) (tempPtr + BLOCK_SIZE * sizeof(bool) * i);
       break;
     }
   }
@@ -70,9 +71,9 @@ void SharedClass::operator delete (void *p) {
   pthread_mutex_lock(&memPoolLock);
   char *tempObjPtr = (char *)p;
   char *tempBasePtr = (char *)memPoolBasePtr;
-  int i = (tempObjPtr - tempBasePtr) / BLOCK_SIZE;
+  int i = (tempObjPtr - tempBasePtr) / (BLOCK_SIZE * sizeof(bool));
   memPoolBitmap[i] = false;
-  pthread_mutex_lock(&memPoolLock);
+  pthread_mutex_unlock(&memPoolLock);
 }		/* -----  end of function operator delete  ----- */
 
 /* ===  FUNCTION  ==============================================================
@@ -119,14 +120,14 @@ void shalloclib::initState ()
     exit(1);
   }
 
-  // Allocating the bitmap of the bitmap in the bitmap
+  // Allocating the bitmap of the heap in the heap
   memPoolBitmap = (bool *)memPoolBasePtr;
-  if (NUMBER_OF_BLOCKS / 8 + 1 > BLOCK_SIZE) {
+  if ((NUMBER_OF_BLOCKS * sizeof(bool) > BLOCK_SIZE) {
     cout<<"Not enough space in one block to store the bitmap. "
           "Increase BLOCK_SIZE"<<endl;
     exit(1);
   }
-  memset (memPoolBitmap, 0, NUMBER_OF_BLOCKS / 8 + 1);
+  memset (memPoolBitmap, 0, NUMBER_OF_BLOCKS * sizeof(bool));
   memPoolBitmap[0] = true;
 
   // Registering signal handler for SIGCHLD
@@ -163,7 +164,7 @@ int shalloclib::sthread_create (void *(*fn) (void *), void * arg)
 }		/* -----  end of function sthread_create  ----- */
 
 /* ===  FUNCTION  ==============================================================
- *         Name:  pthread_join
+ *         Name:  sthread_join
  *  Description:  Waits for given process to terminate
  * =============================================================================
  */
@@ -171,5 +172,15 @@ void shalloclib::sthread_join (int pid)
 {
   waitpid(pid, NULL, 0);
   return;
-}		/* -----  end of function pthread_join  ----- */
+}		/* -----  end of function sthread_join  ----- */
+
+/* ===  FUNCTION  ==============================================================
+ *         Name:  sthread_cancel
+ *  Description:  Tries to terminate the process
+ * =============================================================================
+ */
+void shalloclib::sthread_cancel (int pid)
+{
+  kill(pid, SIGTERM);
+}		/* -----  end of function sthread_cancel  ----- */
 
