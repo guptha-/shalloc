@@ -9,7 +9,7 @@ OBJL = obj/shalloclib.o
 
 CREATEDIR = mkdir -p obj bin test/recent
 
-all: testmain test1 test2 test3
+all: testmain test1 test2 test3 test4
 
 testmain: test/test.cpp
 	$(CREATEDIR)
@@ -39,6 +39,13 @@ obj/test3.o: src/test3.cpp $(INCL)
 test3: obj/test3.o $(OBJL) $(INCL)
 	$(CREATEDIR)
 	g++ -o bin/test3 obj/test3.o $(OBJL) $(C11FLAG) $(WFLAG) $(DFLAG) -lm $(THREADFLAG)
+
+obj/test4.o: src/test4.cpp $(INCL)
+	$(CREATEDIR)
+	g++ -c src/test4.cpp $(C11FLAG) $(WFLAG) $(DFLAG) -o obj/test4.o
+test4: obj/test4.o $(OBJL) $(INCL)
+	$(CREATEDIR)
+	g++ -o bin/test4 obj/test4.o $(OBJL) $(C11FLAG) $(WFLAG) $(DFLAG) -lm $(THREADFLAG)
 
 clean:
 	rm -rf bin obj

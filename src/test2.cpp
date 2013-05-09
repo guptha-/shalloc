@@ -25,7 +25,6 @@ int main() {
   cout<<"Starting test case 2"<<endl;
   int a = 5;
   int childPid = sthread_create(fn1, (void *) &a);
-  cout<<"Parent: Before join"<<endl;
   usleep(10000);
   sthread_join(childPid);
   cout<<"Parent: Done joining process which was dead before join is called "<<endl;

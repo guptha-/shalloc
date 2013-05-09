@@ -55,6 +55,9 @@ MemPool::MemPool (int blockSz, int numberBlks)
     cout<<"Error in mmap"<<endl;
     exit(1);
   }
+  // Now that we have mmaped it, we can unlink the shared memory object. Once
+  // all the processes munmap, the object will be destroyed
+  shm_unlink(keyStr);
 
   // Allocating the status of the heap in the heap
   status = (bool *) basePtr;
