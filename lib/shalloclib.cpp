@@ -154,18 +154,21 @@ SharedClass::SharedClass ()
 void* SharedClass::operator new (size_t size) throw()
 {   
   // Find which memPool the block should go into
+  void *retPtr = NULL;
   if (size <= BLOCK_SIZE_ONE) {
-    return memPoolOne->getBlock();
+    retPtr = memPoolOne->getBlock();
   }
-  if (size <= BLOCK_SIZE_TWO) {
-    return memPoolTwo->getBlock();
+  if ((retPtr == NULL) && (size <= BLOCK_SIZE_TWO)) {
+    retPtr =  memPoolTwo->getBlock();
   }
-  if (size <= BLOCK_SIZE_THREE) {
-    return memPoolThree->getBlock();
+  if ((retPtr == NULL) && (size <= BLOCK_SIZE_THREE)) {
+    retPtr =  memPoolThree->getBlock();
   }
-  cout<<"Trying to allocate memory larger than maximum block size. Tune that!"<<
-    endl;
-  return NULL;
+  if (size > BLOCK_SIZE_THREE) {
+    cout<<"Trying to allocate memory larger than maximum block size. Tune that!"
+      <<endl;
+  }
+  return retPtr;
 }		/* -----  end of function operator new  ----- */
 
 /* ===  FUNCTION  ==============================================================
