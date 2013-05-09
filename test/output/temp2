@@ -1,7 +1,6 @@
 Starting test case 2
 In child 1
 Parent: Done joining process which was dead before join is called 
-Parent: Before join
 In child 2
 Exiting child 2
 Parent: Done joining process which was alive before join called

@@ -29,7 +29,6 @@ int main() {
   sthread_join(childPid);
   cout<<"Parent: Done joining process which was dead before join is called "<<endl;
   childPid = sthread_create(fn2, (void *) &a);
-  cout<<"Parent: Before join"<<endl;
   sthread_join(childPid);
   cout<<"Parent: Done joining process which was alive before join called"<<endl;
 
